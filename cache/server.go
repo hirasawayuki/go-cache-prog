@@ -113,15 +113,15 @@ func (s *server) serve() error {
 func (s *server) ack() {
 	s.writer.WriteResponse(Response{
 		ID:            0,
-		KnownCommands: serveMux.knownCommands(),
+		KnownCommands: mux.knownCommands(),
 	})
 }
 
 // handleRequest processes a request by finding the appropriate handler and applying middlewares.
 func (s *server) handleRequest(ctx context.Context, r *Request) {
-	serveMux.mu.RLock()
-	h, ok := serveMux.m[r.Command]
-	serveMux.mu.RUnlock()
+	mux.mu.RLock()
+	h, ok := mux.m[r.Command]
+	mux.mu.RUnlock()
 	if !ok {
 		s.writer.WriteResponse(Response{
 			ID:  r.ID,
@@ -129,7 +129,7 @@ func (s *server) handleRequest(ctx context.Context, r *Request) {
 		})
 		return
 	}
-	serveMux.Apply(h, serveMux.middleware...).Handle(ctx, s.writer, r)
+	mux.Apply(h, mux.middleware...).Handle(ctx, s.writer, r)
 }
 
 // asyncHandleRequest handles a request asynchronously, managing concurrency limits and timeouts.
@@ -167,9 +167,9 @@ func (s *server) decodePutBody(req *Request) error {
 	return nil
 }
 
-// ServeMux is a request multiplexer.
+// serveMux is a request multiplexer.
 // It registers handlers for different commands and applies middleware.
-type ServeMux struct {
+type serveMux struct {
 	mu              sync.RWMutex
 	allowedCommands map[Cmd]struct{}
 	m               map[Cmd]Handler
@@ -177,7 +177,7 @@ type ServeMux struct {
 }
 
 // Global serveMux instance
-var serveMux = &ServeMux{
+var mux = &serveMux{
 	allowedCommands: map[Cmd]struct{}{
 		CmdGet:   {},
 		CmdPut:   {},
@@ -185,10 +185,9 @@ var serveMux = &ServeMux{
 	},
 	m: map[Cmd]Handler{},
 }
-var Mux = serveMux
 
 // HandleFunc registers a handler function for a specific command.
-func (mux *ServeMux) HandleFunc(cmd Cmd, handler func(ctx context.Context, w ResponseWriter, r *Request)) {
+func HandleFunc(cmd Cmd, handler func(ctx context.Context, w ResponseWriter, r *Request)) {
 	if _, ok := mux.allowedCommands[cmd]; !ok {
 		panic(fmt.Sprintf("error: unsupported command registered: %s", cmd))
 	}
@@ -199,28 +198,30 @@ func (mux *ServeMux) HandleFunc(cmd Cmd, handler func(ctx context.Context, w Res
 }
 
 // HandleGetFunc registers a handler for the get command.
-func (mux *ServeMux) HandleGetFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
-	mux.HandleFunc(CmdGet, handler)
+func HandleGetFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
+	HandleFunc(CmdGet, handler)
 }
 
 // HandlePutFunc registers a handler for the put command.
-func (mux *ServeMux) HandlePutFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
-	mux.HandleFunc(CmdPut, handler)
+func HandlePutFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
+	HandleFunc(CmdPut, handler)
 }
 
 // HandleCloseFunc registers a handler for the close command.
-func (mux *ServeMux) HandleCloseFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
-	mux.HandleFunc(CmdClose, handler)
+func HandleCloseFunc(handler func(ctx context.Context, w ResponseWriter, r *Request)) {
+	HandleFunc(CmdClose, handler)
 }
 
 // Use adds middleware to the middleware chain.
-func (mux *ServeMux) Use(middleware ...Middleware) {
+func Use(middleware ...Middleware) {
+	mux.mu.Lock()
+	defer mux.mu.Unlock()
 	mux.middleware = append(mux.middleware, middleware...)
 }
 
 // Apply wraps a handler with a chain of middleware in the order they
 // should be executed (from outermost to innermost).
-func (mux *ServeMux) Apply(h Handler, middleware ...Middleware) Handler {
+func (mux *serveMux) Apply(h Handler, middleware ...Middleware) Handler {
 	for i := range len(middleware) {
 		h = middleware[(len(middleware)-1)-i](h)
 	}
@@ -228,7 +229,7 @@ func (mux *ServeMux) Apply(h Handler, middleware ...Middleware) Handler {
 }
 
 // knownCommands returns a list of commands that have registered handlers.
-func (mux *ServeMux) knownCommands() []Cmd {
+func (mux *serveMux) knownCommands() []Cmd {
 	return slices.Collect(maps.Keys(mux.m))
 }
 

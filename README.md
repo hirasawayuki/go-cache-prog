@@ -88,9 +88,9 @@ func main() {
     handler := NewMyCacheHandler()
 
     // Register handlers
-    cache.Mux.HandleGetFunc(handler.HandleGet)
-    cache.Mux.HandlePutFunc(handler.HandlePut)
-    cache.Mux.HandleCloseFunc(handler.HandleClose)
+    cache.HandleGetFunc(handler.HandleGet)
+    cache.HandlePutFunc(handler.HandlePut)
+    cache.HandleCloseFunc(handler.HandleClose)
 
     // Start cache server
     if err := cache.Serve(); err != nil {
@@ -105,7 +105,7 @@ The server supports middleware for cross-cutting concerns:
 
 ```go
 // Add logging middleware
-cache.Mux.Use(LoggingMiddleware())
+cache.Use(LoggingMiddleware())
 ```
 
 ## Example Usage
@@ -120,10 +120,10 @@ if err != nil {
 }
 
 // Register with middleware
-cache.Mux.Use(diskcache.LoggingMiddleware())
-cache.Mux.HandleGetFunc(handler.HandleGet)
-cache.Mux.HandlePutFunc(handler.HandlePut)
-cache.Mux.HandleCloseFunc(handler.HandleClose)
+cache.Use(diskcache.LoggingMiddleware())
+cache.HandleGetFunc(handler.HandleGet)
+cache.HandlePutFunc(handler.HandlePut)
+cache.HandleCloseFunc(handler.HandleClose)
 
 // Run server
 if err := cache.Serve(); err != nil {

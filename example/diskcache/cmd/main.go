@@ -21,12 +21,12 @@ func main() {
 	}
 
 	// Register the logging middleware to record request/response details
-	cache.Mux.Use(diskcache.LoggingMiddleware())
+	cache.Use(diskcache.LoggingMiddleware())
 
 	// Register handlers for each of the GOCACHEPROG commands
-	cache.Mux.HandleGetFunc(h.HandleGet)
-	cache.Mux.HandlePutFunc(h.HandlePut)
-	cache.Mux.HandleCloseFunc(h.HandleClose)
+	cache.HandleGetFunc(h.HandleGet)
+	cache.HandlePutFunc(h.HandlePut)
+	cache.HandleCloseFunc(h.HandleClose)
 
 	// Start the cache server with server options
 	if err := cache.Serve(
